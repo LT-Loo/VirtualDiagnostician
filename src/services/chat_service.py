@@ -7,7 +7,6 @@ from database.db_manager import DatabaseManager
 logger = logging.getLogger(__name__)
 
 class ChatService:
-    """聊天服务 - 处理患者对话交互"""
     
     def __init__(self, db_manager: DatabaseManager):
         self.db_manager = db_manager
