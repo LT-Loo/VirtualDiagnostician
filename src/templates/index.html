@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Virtual Diagnostic Assistant</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .chat-container {
+            height: calc(100vh - 200px);
+        }
+        .message-user {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .message-assistant {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        }
+        .fade-in {
+            animation: fadeIn 0.3s ease-in;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 font-sans">
+    <!-- Navigation Bar -->
+    <nav class="bg-white shadow-lg border-b">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-stethoscope text-2xl text-blue-600"></i>
+                    </div>
+                    <div class="ml-4">
+                        <h1 class="text-xl font-semibold text-gray-900">Virtual Diagnostic Assistant</h1>
+                        <p class="text-sm text-gray-500">AI Medical Consultation System</p>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <button id="newPatientBtn" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition">
+                        <i class="fas fa-user-plus mr-2"></i>New Patient
+                    </button>
+                    <button id="exportBtn" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition">
+                        <i class="fas fa-download mr-2"></i>Export Data
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+            <!-- Left Panel - Patient Information -->
+            <div class="lg:col-span-1">
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h2 class="text-lg font-semibold text-gray-900 mb-4">
+                        <i class="fas fa-user-circle mr-2 text-blue-600"></i>Patient Information
+                    </h2>
+                    
+                    <!-- Patient Selection -->
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Select Patient</label>
+                        <select id="patientSelect" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            <option value="default">Default Patient</option>
+                        </select>
+                    </div>
+
+                    <!-- Patient Details -->
+                    <div id="patientInfo" class="space-y-3">
+                        <div class="flex justify-between">
+                            <span class="text-sm text-gray-600">Name:</span>
+                            <span id="patientName" class="text-sm font-medium">-</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-sm text-gray-600">Age:</span>
+                            <span id="patientAge" class="text-sm font-medium">-</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-sm text-gray-600">Gender:</span>
+                            <span id="patientGender" class="text-sm font-medium">-</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-sm text-gray-600">Phone:</span>
+                            <span id="patientPhone" class="text-sm font-medium">-</span>
+                        </div>
+                    </div>
+
+                    <!-- Medical History Summary -->
+                    <div class="mt-6">
+                        <h3 class="text-sm font-medium text-gray-900 mb-2">Medical History Summary</h3>
+                        <div id="medicalHistory" class="text-sm text-gray-600 bg-gray-50 p-3 rounded-lg">
+                            No medical history recorded
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Center Panel - Chat Interface -->
+            <div class="lg:col-span-2">
+                <div class="bg-white rounded-lg shadow">
+                    <!-- Chat Header -->
+                    <div class="border-b px-6 py-4">
+                        <div class="flex items-center justify-between">
+                            <h2 class="text-lg font-semibold text-gray-900">
+                                <i class="fas fa-comments mr-2 text-green-600"></i>Medical Consultation
+                            </h2>
+                            <div class="flex space-x-2">
+                                <button id="clearChatBtn" class="text-gray-500 hover:text-red-600 transition">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                                <div class="flex items-center text-sm text-gray-500">
+                                    <div id="onlineStatus" class="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+                                    Online
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Chat Messages Area -->
+                    <div id="chatContainer" class="chat-container overflow-y-auto p-6 space-y-4">
+                        <div class="text-center text-gray-500 text-sm">
+                            <i class="fas fa-robot text-2xl mb-2"></i>
+                            <p>Hello! I'm your Virtual Diagnostic Assistant. Please tell me about your symptoms or concerns.</p>
+                        </div>
+                    </div>
+
+                    <!-- Input Area -->
+                    <div class="border-t px-6 py-4">
+                        <div class="flex space-x-3">
+                            <input type="text" id="messageInput" 
+                                   placeholder="Please describe your symptoms or concerns..." 
+                                   class="flex-1 border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            <button id="sendBtn" 
+                                    class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition disabled:opacity-50">
+                                <i class="fas fa-paper-plane"></i>
+                            </button>
+                        </div>
+                        <div class="flex items-center mt-2 text-xs text-gray-500">
+                            <i class="fas fa-info-circle mr-1"></i>
+                            Press Enter to send message, Shift+Enter for new line
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Panel - Diagnostic Information -->
+            <div class="lg:col-span-1">
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h2 class="text-lg font-semibold text-gray-900 mb-4">
+                        <i class="fas fa-chart-line mr-2 text-purple-600"></i>Diagnostic Information
+                    </h2>
+
+                    <!-- Symptoms Record -->
+                    <div class="mb-6">
+                        <h3 class="text-sm font-medium text-gray-900 mb-2">Symptoms Record</h3>
+                        <div id="symptomsList" class="space-y-2">
+                            <div class="text-sm text-gray-500">No symptoms recorded</div>
+                        </div>
+                    </div>
+
+                    <!-- Conversation Statistics -->
+                    <div class="mb-6">
+                        <h3 class="text-sm font-medium text-gray-900 mb-2">Conversation Statistics</h3>
+                        <div class="space-y-2">
+                            <div class="flex justify-between text-sm">
+                                <span class="text-gray-600">Message Count:</span>
+                                <span id="messageCount" class="font-medium">0</span>
+                            </div>
+                            <div class="flex justify-between text-sm">
+                                <span class="text-gray-600">Chat Duration:</span>
+                                <span id="chatDuration" class="font-medium">-</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Quick Actions -->
+                    <div class="space-y-2">
+                        <button id="exportChatBtn" class="w-full bg-purple-600 text-white py-2 rounded-lg hover:bg-purple-700 transition text-sm">
+                            <i class="fas fa-file-export mr-2"></i>Export Chat
+                        </button>
+                        <button id="viewHistoryBtn" class="w-full bg-gray-600 text-white py-2 rounded-lg hover:bg-gray-700 transition text-sm">
+                            <i class="fas fa-history mr-2"></i>View History
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- New Patient Modal -->
+    <div id="newPatientModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50">
+        <div class="flex items-center justify-center min-h-screen p-4">
+            <div class="bg-white rounded-lg shadow-xl max-w-md w-full">
+                <div class="px-6 py-4 border-b">
+                    <h3 class="text-lg font-semibold text-gray-900">Create New Patient</h3>
+                </div>
+                <div class="px-6 py-4 space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Name *</label>
+                        <input type="text" id="newPatientName" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Age</label>
+                            <input type="number" id="newPatientAge" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Gender</label>
+                            <select id="newPatientGender" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500">
+                                <option value="">Please Select</option>
+                                <option value="Male">Male</option>
+                                <option value="Female">Female</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                        <input type="tel" id="newPatientPhone" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                        <input type="email" id="newPatientEmail" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500">
+                    </div>
+                </div>
+                <div class="px-6 py-4 border-t flex justify-end space-x-3">
+                    <button id="cancelPatientBtn" class="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
+                    <button id="savePatientBtn" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html> 
