@@ -6,6 +6,7 @@ from datetime import datetime
 from database.db_manager import DatabaseManager
 from services.chat_service import ChatService
 from services.patient_service import PatientService
+from services.training_data_service import TrainingDataService
 from utils.json_handler import JSONHandler
 
 # 配置日志
@@ -19,6 +20,7 @@ CORS(app)  # 允许跨域请求
 db_manager = DatabaseManager()
 chat_service = ChatService(db_manager)
 patient_service = PatientService(db_manager)
+training_data_service = TrainingDataService(db_manager)
 json_handler = JSONHandler()
 
 @app.route('/')
@@ -54,11 +56,20 @@ def chat():
 def get_patient(patient_id):
     """获取患者信息"""
     try:
-        patient_data = patient_service.get_patient_by_id(patient_id)
-        if patient_data:
-            return jsonify(patient_data)
+        # 检查是否是训练数据患者
+        if patient_id.startswith('training_'):
+            patient_data = training_data_service.load_patient_from_file(patient_id.replace('training_', ''))
+            if patient_data:
+                patient_data['id'] = patient_id  # 保持training_前缀
+                return jsonify(patient_data)
+            else:
+                return jsonify({'error': 'Training patient not found'}), 404
         else:
-            return jsonify({'error': 'Patient not found'}), 404
+            patient_data = patient_service.get_patient_by_id(patient_id)
+            if patient_data:
+                return jsonify(patient_data)
+            else:
+                return jsonify({'error': 'Patient not found'}), 404
     
     except Exception as e:
         logger.error(f"Error getting patient information: {str(e)}")
@@ -78,8 +89,9 @@ def create_patient():
 
 @app.route('/api/patients', methods=['GET'])
 def get_patients():
-    """获取患者列表"""
+    """获取患者列表（仅普通患者）"""
     try:
+        # 只获取普通患者
         patients = patient_service.search_patients()
         return jsonify(patients)
     
@@ -102,26 +114,175 @@ def get_chat_history(patient_id):
 def export_patient_data(patient_id):
     """导出患者数据为JSON"""
     try:
-        patient_data = patient_service.get_patient_by_id(patient_id)
-        chat_history = chat_service.get_chat_history(patient_id)
-        
-        export_data = {
-            'patient_info': patient_data,
-            'chat_history': chat_history,
-            'export_timestamp': datetime.now().isoformat()
-        }
-        
-        # 保存到JSON文件
-        filename = json_handler.save_patient_data(patient_id, export_data)
-        
-        return jsonify({
-            'status': 'success',
-            'filename': filename,
-            'data': export_data
-        })
+        # 检查是否是训练数据患者
+        if patient_id.startswith('training_'):
+            # 导出训练数据格式
+            export_data = training_data_service.export_training_patient(patient_id)
+            if export_data:
+                return jsonify({
+                    'status': 'success',
+                    'filename': export_data['filename'],
+                    'data': export_data['data'],
+                    'is_training_data': True
+                })
+            else:
+                return jsonify({'error': 'Training patient not found'}), 404
+        else:
+            # 原有的导出逻辑
+            patient_data = patient_service.get_patient_by_id(patient_id)
+            chat_history = chat_service.get_chat_history(patient_id)
+            
+            export_data = {
+                'patient_info': patient_data,
+                'chat_history': chat_history,
+                'export_timestamp': datetime.now().isoformat()
+            }
+            
+            # 保存到JSON文件
+            filename = json_handler.save_patient_data(patient_id, export_data)
+            
+            return jsonify({
+                'status': 'success',
+                'filename': filename,
+                'data': export_data,
+                'is_training_data': False
+            })
     
     except Exception as e:
         logger.error(f"Error exporting patient data: {str(e)}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+# 训练数据相关API端点
+@app.route('/api/training/patients', methods=['GET'])
+def get_training_patients():
+    """获取训练数据患者列表"""
+    try:
+        limit = request.args.get('limit', 20, type=int)
+        patients = training_data_service.load_training_patients(limit)
+        return jsonify(patients)
+    
+    except Exception as e:
+        logger.error(f"Error getting training patients: {str(e)}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+@app.route('/api/training/patient/<patient_id>', methods=['GET'])
+def get_training_patient(patient_id):
+    """获取单个训练数据患者信息"""
+    try:
+        # 去掉training_前缀
+        original_id = patient_id.replace('training_', '') if patient_id.startswith('training_') else patient_id
+        patient_data = training_data_service.load_patient_from_file(original_id)
+        
+        if patient_data:
+            return jsonify(patient_data)
+        else:
+            return jsonify({'error': 'Training patient not found'}), 404
+    
+    except Exception as e:
+        logger.error(f"Error getting training patient: {str(e)}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+@app.route('/api/training/summary', methods=['GET'])
+def get_training_summary():
+    """获取训练数据统计信息"""
+    try:
+        summary = training_data_service.get_training_patients_summary()
+        return jsonify(summary)
+    
+    except Exception as e:
+        logger.error(f"Error getting training summary: {str(e)}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+@app.route('/api/training/import', methods=['POST'])
+def import_training_patients():
+    """将训练数据患者导入到数据库"""
+    try:
+        data = request.get_json()
+        limit = data.get('limit', 10)
+        
+        result = training_data_service.import_training_patients_to_db(limit)
+        return jsonify(result)
+    
+    except Exception as e:
+        logger.error(f"Error importing training patients: {str(e)}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+@app.route('/api/training/import-json', methods=['POST'])
+def import_json_to_training():
+    """导入JSON文件到训练数据Set-0文件夹"""
+    try:
+        # 检查是否有文件上传
+        if 'file' not in request.files:
+            return jsonify({'error': 'No file provided'}), 400
+        
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'error': 'No file selected'}), 400
+        
+        # 检查文件格式
+        if not file.filename.endswith('.json'):
+            return jsonify({'error': 'File must be a JSON file'}), 400
+        
+        # 读取文件内容
+        file_content = file.read().decode('utf-8')
+        
+        # 验证JSON格式
+        try:
+            import json
+            data = json.loads(file_content)
+            validation_result = training_data_service.validate_json_format(data)
+            
+            if not validation_result['valid']:
+                return jsonify({
+                    'error': 'Invalid JSON format',
+                    'details': validation_result['errors']
+                }), 400
+        
+        except json.JSONDecodeError:
+            return jsonify({'error': 'Invalid JSON format'}), 400
+        
+        # 导入文件到Set-0文件夹
+        result = training_data_service.import_json_to_set0(file_content, file.filename)
+        
+        if result['status'] == 'success':
+            return jsonify({
+                'status': 'success',
+                'message': result['message'],
+                'filename': result['filename'],
+                'patient_id': result['patient_id']
+            })
+        else:
+            return jsonify({'error': result['error']}), 400
+    
+    except Exception as e:
+        logger.error(f"Error importing JSON file: {str(e)}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+@app.route('/api/training/rename-patient', methods=['POST'])
+def rename_training_patient():
+    """重命名训练数据患者文件夹"""
+    try:
+        data = request.get_json()
+        old_id = data.get('old_id')
+        new_id = data.get('new_id')
+        
+        if not old_id or not new_id:
+            return jsonify({'error': 'Both old_id and new_id are required'}), 400
+        
+        result = training_data_service.rename_patient_folder(old_id, new_id)
+        
+        if result['status'] == 'success':
+            return jsonify({
+                'status': 'success',
+                'message': result['message'],
+                'old_id': result['old_id'],
+                'new_id': result['new_id']
+            })
+        else:
+            return jsonify({'error': result['error']}), 400
+    
+    except Exception as e:
+        logger.error(f"Error renaming patient: {str(e)}")
         return jsonify({'error': 'Internal server error'}), 500
 
 if __name__ == '__main__':
@@ -140,6 +301,7 @@ if __name__ == '__main__':
     print("   ✓ Patient Chat Interaction")
     print("   ✓ Medical History Management") 
     print("   ✓ Data Export Functions")
+    print("   ✓ Training Data Integration")
     print("🌐 Service URL: http://localhost:5000")
     print("📝 Test Conversations:")
     print("   • Hi, how are you?")
