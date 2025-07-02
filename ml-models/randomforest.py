@@ -109,7 +109,7 @@ def main():
         #         os.makedirs(os.path.dirname(localPath), exist_ok = True)
         #         item.download_to_filename(localPath)
 
-        folder = "data/Set-1"
+        folder = "../data/Set-1"
         model = randomForestModel()
         model.preprocess_data(folder)
         model.train()
