@@ -42,6 +42,16 @@ class DatabaseManager:
                     phone TEXT,
                     email TEXT,
                     medical_history TEXT,  -- JSON格式存储病史
+                    -- 训练数据专用字段
+                    birthdate TEXT,
+                    blood_type TEXT,
+                    address TEXT,
+                    weight REAL,
+                    height REAL,
+                    notes TEXT,
+                    is_training_data BOOLEAN DEFAULT FALSE,
+                    original_format TEXT,  -- JSON格式存储原始数据
+                    source_file TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
@@ -102,8 +112,10 @@ class DatabaseManager:
     def insert_patient(self, patient_data: Dict) -> str:
         """插入新患者"""
         query = '''
-            INSERT INTO patients (id, name, age, gender, phone, email, medical_history)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO patients (id, name, age, gender, phone, email, medical_history,
+                                birthdate, blood_type, address, weight, height, notes,
+                                is_training_data, original_format, source_file)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         '''
         params = (
             patient_data.get('id'),
@@ -112,7 +124,16 @@ class DatabaseManager:
             patient_data.get('gender'),
             patient_data.get('phone'),
             patient_data.get('email'),
-            json.dumps(patient_data.get('medical_history', {}), ensure_ascii=False)
+            json.dumps(patient_data.get('medical_history', {}), ensure_ascii=False),
+            patient_data.get('birthdate'),
+            patient_data.get('blood_type'),
+            patient_data.get('address'),
+            patient_data.get('weight'),
+            patient_data.get('height'),
+            patient_data.get('notes'),
+            patient_data.get('is_training_data', False),
+            json.dumps(patient_data.get('original_format', {}), ensure_ascii=False) if patient_data.get('original_format') else None,
+            patient_data.get('source_file')
         )
         
         self.execute_insert(query, params)
@@ -128,6 +149,9 @@ class DatabaseManager:
             # 解析JSON格式的病史
             if patient['medical_history']:
                 patient['medical_history'] = json.loads(patient['medical_history'])
+            # 解析JSON格式的原始数据
+            if patient.get('original_format'):
+                patient['original_format'] = json.loads(patient['original_format'])
             return patient
         return None
     
@@ -136,7 +160,8 @@ class DatabaseManager:
         query = '''
             UPDATE patients 
             SET name = ?, age = ?, gender = ?, phone = ?, email = ?, 
-                medical_history = ?, updated_at = CURRENT_TIMESTAMP
+                medical_history = ?, birthdate = ?, blood_type = ?, address = ?,
+                weight = ?, height = ?, notes = ?, updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
         '''
         params = (
@@ -146,6 +171,12 @@ class DatabaseManager:
             patient_data.get('phone'),
             patient_data.get('email'),
             json.dumps(patient_data.get('medical_history', {}), ensure_ascii=False),
+            patient_data.get('birthdate'),
+            patient_data.get('blood_type'),
+            patient_data.get('address'),
+            patient_data.get('weight'),
+            patient_data.get('height'),
+            patient_data.get('notes'),
             patient_id
         )
         

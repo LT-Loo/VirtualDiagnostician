@@ -46,6 +46,9 @@
                     <button id="exportBtn" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition">
                         <i class="fas fa-download mr-2"></i>Export Data
                     </button>
+                    <button id="importBtn" class="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition">
+                        <i class="fas fa-upload mr-2"></i>Import Data
+                    </button>
                 </div>
             </div>
         </div>
@@ -66,6 +69,33 @@
                         <select id="patientSelect" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                             <option value="default">Default Patient</option>
                         </select>
+                    </div>
+
+                    <!-- Data Control Panel -->
+                    <div class="mb-5 p-3 rounded-lg training-control-panel">
+                        <h4 class="text-sm font-medium text-purple-800 mb-2">
+                            <i class="fas fa-database mr-1"></i>Data Control (Set-0)
+                        </h4>
+                        <div class="space-y-2">
+                            <div class="flex items-center justify-between text-sm">
+                                <span class="text-purple-600">Loaded:</span>
+                                <span id="loadedTrainingCount" class="training-stats-badge">0</span>
+                            </div>
+                            <div class="flex items-center justify-between text-sm">
+                                <span class="text-purple-600">Total Available:</span>
+                                <span id="totalTrainingCount" class="font-medium text-purple-800">-</span>
+                            </div>
+                            <div class="flex space-x-2">
+                                <input type="number" id="trainingLoadCount" placeholder="Enter count" min="1" max="999" 
+                                       class="flex-1 border border-purple-300 rounded px-2 py-1 text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                                <button id="loadMoreTrainingBtn" class="bg-purple-600 text-white px-3 py-1 rounded text-sm hover:bg-purple-700 loading-button transition-all duration-200">
+                                    Load
+                                </button>
+                            </div>
+                            <div class="mt-1 text-xs text-purple-600">
+                                <span id="loadingHint">Enter number of patients to load</span>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Patient Details -->
@@ -228,6 +258,52 @@
                 <div class="px-6 py-4 border-t flex justify-end space-x-3">
                     <button id="cancelPatientBtn" class="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
                     <button id="savePatientBtn" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Import Data Modal -->
+    <div id="importDataModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50">
+        <div class="flex items-center justify-center min-h-screen p-4">
+            <div class="bg-white rounded-lg shadow-xl max-w-md w-full">
+                <div class="px-6 py-4 border-b">
+                    <h3 class="text-lg font-semibold text-gray-900">
+                        <i class="fas fa-upload mr-2 text-orange-600"></i>Import Patient Data
+                    </h3>
+                </div>
+                <div class="px-6 py-4 space-y-4">
+                    <div class="text-sm text-gray-600 mb-4">
+                        <p>Upload a JSON file with patient data to import to the dataset.</p>
+                        <p class="mt-2"><strong>Expected format:</strong></p>
+                        <pre class="bg-gray-50 p-2 rounded text-xs mt-1">{
+  "name": "Patient Name",
+  "birthdate": "1984-09-25",
+  "gender": "F",
+  "blood_type": "AB+",
+  "address": "Address...",
+  "weight": 85,
+  "height": 182,
+  "notes": "Notes..."
+}</pre>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            <i class="fas fa-file-upload mr-1"></i>Select JSON File
+                        </label>
+                        <input type="file" id="importFileInput" accept=".json" 
+                               class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-500">
+                    </div>
+                    <div id="importPreview" class="hidden">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Preview:</label>
+                        <div id="importPreviewContent" class="bg-gray-50 p-3 rounded-lg text-sm max-h-32 overflow-y-auto"></div>
+                    </div>
+                </div>
+                <div class="px-6 py-4 border-t flex justify-end space-x-3">
+                    <button id="cancelImportBtn" class="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
+                    <button id="confirmImportBtn" class="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50" disabled>
+                        <i class="fas fa-upload mr-2"></i>Import
+                    </button>
                 </div>
             </div>
         </div>

@@ -3,11 +3,14 @@ class VirtualDiagnostician {
         this.currentPatientId = 'default';
         this.messageCount = 0;
         this.chatStartTime = null;
+        this.loadedTrainingPatients = [];
+        this.trainingDataStats = null;
         
         this.initializeElements();
         this.bindEvents();
         this.loadPatients();
         this.initializeChat();
+        this.loadTrainingDataStats();
     }
 
     initializeElements() {
@@ -32,14 +35,30 @@ class VirtualDiagnostician {
         // 按钮元素
         this.newPatientBtn = document.getElementById('newPatientBtn');
         this.exportBtn = document.getElementById('exportBtn');
+        this.importBtn = document.getElementById('importBtn');
         this.clearChatBtn = document.getElementById('clearChatBtn');
         this.exportChatBtn = document.getElementById('exportChatBtn');
         this.viewHistoryBtn = document.getElementById('viewHistoryBtn');
+        
+        // 训练数据控制元素
+        this.loadedTrainingCount = document.getElementById('loadedTrainingCount');
+        this.totalTrainingCount = document.getElementById('totalTrainingCount');
+        this.trainingLoadCount = document.getElementById('trainingLoadCount');
+        this.loadMoreTrainingBtn = document.getElementById('loadMoreTrainingBtn');
+        this.loadingHint = document.getElementById('loadingHint');
         
         // 模态框元素
         this.newPatientModal = document.getElementById('newPatientModal');
         this.savePatientBtn = document.getElementById('savePatientBtn');
         this.cancelPatientBtn = document.getElementById('cancelPatientBtn');
+        
+        // 导入模态框元素
+        this.importDataModal = document.getElementById('importDataModal');
+        this.importFileInput = document.getElementById('importFileInput');
+        this.importPreview = document.getElementById('importPreview');
+        this.importPreviewContent = document.getElementById('importPreviewContent');
+        this.confirmImportBtn = document.getElementById('confirmImportBtn');
+        this.cancelImportBtn = document.getElementById('cancelImportBtn');
     }
 
     bindEvents() {
@@ -62,18 +81,39 @@ class VirtualDiagnostician {
         // 按钮事件
         this.newPatientBtn.addEventListener('click', () => this.showNewPatientModal());
         this.exportBtn.addEventListener('click', () => this.exportPatientData());
+        this.importBtn.addEventListener('click', () => this.showImportDataModal());
         this.clearChatBtn.addEventListener('click', () => this.clearChat());
         this.exportChatBtn.addEventListener('click', () => this.exportChatHistory());
         this.viewHistoryBtn.addEventListener('click', () => this.viewHistory());
+        
+        // 训练数据控制事件
+        this.loadMoreTrainingBtn.addEventListener('click', () => this.loadMoreTrainingData());
+        this.trainingLoadCount.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                this.loadMoreTrainingData();
+            }
+        });
         
         // 模态框事件
         this.savePatientBtn.addEventListener('click', () => this.saveNewPatient());
         this.cancelPatientBtn.addEventListener('click', () => this.hideNewPatientModal());
         
+        // 导入模态框事件
+        this.importFileInput.addEventListener('change', (e) => this.handleFileSelect(e));
+        this.confirmImportBtn.addEventListener('click', () => this.confirmImport());
+        this.cancelImportBtn.addEventListener('click', () => this.hideImportDataModal());
+        
         // 点击模态框外部关闭
         this.newPatientModal.addEventListener('click', (e) => {
             if (e.target === this.newPatientModal) {
                 this.hideNewPatientModal();
+            }
+        });
+
+        this.importDataModal.addEventListener('click', (e) => {
+            if (e.target === this.importDataModal) {
+                this.hideImportDataModal();
             }
         });
 
@@ -202,25 +242,54 @@ class VirtualDiagnostician {
 
     async loadPatients() {
         try {
+            // 只加载普通患者
             const response = await fetch('/api/patients');
             if (response.ok) {
-                const patients = await response.json();
+                const allPatients = await response.json();
+                const regularPatients = allPatients.filter(p => !p.id.startsWith('training_'));
                 
-                // 清空并重新填充选择器
-                this.patientSelect.innerHTML = '<option value="default">Default Patient</option>';
-                
-                patients.forEach(patient => {
-                    const option = document.createElement('option');
-                    option.value = patient.id;
-                    option.textContent = patient.name;
-                    this.patientSelect.appendChild(option);
-                });
+                // 重新填充选择器
+                this.updatePatientSelect(regularPatients, this.loadedTrainingPatients);
             }
             
             this.loadPatientInfo();
         } catch (error) {
             console.error('Failed to load patient list:', error);
         }
+    }
+    
+    updatePatientSelect(regularPatients, trainingPatients) {
+        // 清空并重新填充选择器
+        this.patientSelect.innerHTML = '<option value="default">Default Patient</option>';
+        
+        // 添加普通患者
+        if (regularPatients.length > 0) {
+            const regularGroup = document.createElement('optgroup');
+            regularGroup.label = 'Regular Patients';
+            regularPatients.forEach(patient => {
+                const option = document.createElement('option');
+                option.value = patient.id;
+                option.textContent = patient.name;
+                regularGroup.appendChild(option);
+            });
+            this.patientSelect.appendChild(regularGroup);
+        }
+        
+        // 添加训练数据患者
+        if (trainingPatients.length > 0) {
+            const trainingGroup = document.createElement('optgroup');
+            trainingGroup.label = 'Training Data Patients';
+            trainingPatients.forEach(patient => {
+                const option = document.createElement('option');
+                option.value = patient.id;
+                option.textContent = `${patient.name} (Training)`;
+                trainingGroup.appendChild(option);
+            });
+            this.patientSelect.appendChild(trainingGroup);
+        }
+        
+        // 更新统计信息
+        this.updateTrainingDataStats();
     }
 
     async loadPatientInfo() {
@@ -245,10 +314,18 @@ class VirtualDiagnostician {
     }
 
     updatePatientDisplay(patient) {
+        // 检查是否是训练数据患者
+        const isTrainingData = patient.id && patient.id.startsWith('training_');
+        
         this.patientName.textContent = patient.name || '-';
         this.patientAge.textContent = patient.age || '-';
         this.patientGender.textContent = patient.gender || '-';
         this.patientPhone.textContent = patient.phone || '-';
+        
+        // 训练数据患者不需要特殊标识，保持简洁
+        // if (isTrainingData) {
+        //     this.patientName.innerHTML = `${patient.name || '-'} <span class="bg-blue-100 text-blue-800 text-xs font-medium px-2 py-1 rounded-full ml-2">Training Data</span>`;
+        // }
         
         // 显示病史摘要
         if (patient.medical_history && patient.medical_history.records) {
@@ -257,8 +334,18 @@ class VirtualDiagnostician {
                 .map(record => record.condition)
                 .join(', ');
             this.medicalHistory.textContent = historyText || 'No medical history recorded';
+        } else if (isTrainingData && patient.medical_history && patient.medical_history.notes) {
+            // 训练数据显示notes
+            this.medicalHistory.textContent = patient.medical_history.notes || 'No medical history recorded';
         } else {
             this.medicalHistory.textContent = 'No medical history recorded';
+        }
+        
+        // 为训练数据患者显示额外信息
+        if (isTrainingData) {
+            this.addTrainingDataInfo(patient);
+        } else {
+            this.removeTrainingDataInfo();
         }
     }
 
@@ -359,13 +446,147 @@ class VirtualDiagnostician {
         }
     }
 
+    showImportDataModal() {
+        this.importDataModal.classList.remove('hidden');
+        this.importFileInput.focus();
+    }
+    
+    hideImportDataModal() {
+        this.importDataModal.classList.add('hidden');
+        // 清空表单
+        this.importFileInput.value = '';
+        this.importPreview.classList.add('hidden');
+        this.importPreviewContent.textContent = '';
+        this.confirmImportBtn.disabled = true;
+    }
+
+    handleFileSelect(event) {
+        const file = event.target.files[0];
+        if (!file) {
+            this.importPreview.classList.add('hidden');
+            this.confirmImportBtn.disabled = true;
+            return;
+        }
+
+        if (!file.name.endsWith('.json')) {
+            this.showError('Please select a JSON file');
+            this.importFileInput.value = '';
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const content = e.target.result;
+                const data = JSON.parse(content);
+                
+                // 验证必要字段
+                if (!data.name) {
+                    throw new Error('Missing required field: name');
+                }
+                
+                // 显示预览
+                this.importPreviewContent.textContent = JSON.stringify(data, null, 2);
+                this.importPreview.classList.remove('hidden');
+                this.confirmImportBtn.disabled = false;
+                
+            } catch (error) {
+                this.showError('Invalid JSON file: ' + error.message);
+                this.importFileInput.value = '';
+                this.importPreview.classList.add('hidden');
+                this.confirmImportBtn.disabled = true;
+            }
+        };
+        reader.readAsText(file);
+    }
+
+    async confirmImport() {
+        const file = this.importFileInput.files[0];
+        if (!file) {
+            this.showError('Please select a file to import');
+            return;
+        }
+
+        try {
+            this.confirmImportBtn.disabled = true;
+            this.confirmImportBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Importing...';
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const response = await fetch('/api/training/import-json', {
+                method: 'POST',
+                body: formData
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                this.hideImportDataModal();
+                
+                // 显示成功消息，包含ID来源信息
+                let successMessage = `Data imported successfully to Set-0 folder: ${data.filename}`;
+                if (data.id_source === 'filename') {
+                    successMessage += ` (Used ID from filename)`;
+                } else {
+                    successMessage += ` (Generated new ID: ${data.patient_id})`;
+                }
+                this.showSuccess(successMessage);
+                
+                // 刷新训练数据统计
+                await this.loadTrainingDataStats();
+                
+                // 重新加载患者列表以包含新导入的患者
+                await this.refreshPatientLists();
+                
+                // 如果当前没有加载足够的训练患者，提示用户加载更多
+                if (this.trainingDataStats && this.loadedTrainingPatients.length < this.trainingDataStats.total_patients) {
+                    setTimeout(() => {
+                        this.showNotification('New patient imported. Click "Load" to see it in the patient list.', 'info');
+                    }, 2000);
+                }
+            } else {
+                this.showError('Import failed: ' + data.error);
+            }
+        } catch (error) {
+            this.showError('Import failed: ' + error.message);
+        } finally {
+            this.confirmImportBtn.disabled = false;
+            this.confirmImportBtn.innerHTML = '<i class="fas fa-upload mr-2"></i>Import';
+        }
+    }
+    
+    async refreshPatientLists() {
+        /**
+         * 刷新患者列表，包括普通患者和当前已加载的训练患者
+         */
+        try {
+            // 重新加载普通患者
+            const regularResponse = await fetch('/api/patients');
+            if (regularResponse.ok) {
+                const allPatients = await regularResponse.json();
+                const regularPatients = allPatients.filter(p => !p.id.startsWith('training_'));
+                
+                // 更新患者选择器
+                this.updatePatientSelect(regularPatients, this.loadedTrainingPatients);
+            }
+        } catch (error) {
+            console.error('Failed to refresh patient lists:', error);
+        }
+    }
+
     async exportPatientData() {
         try {
             const response = await fetch(`/api/export/patient/${this.currentPatientId}`);
             const data = await response.json();
 
             if (response.ok) {
-                this.showSuccess(`Data exported: ${data.filename}`);
+                // 检查是否是训练数据
+                const isTrainingData = data.is_training_data;
+                const exportType = isTrainingData ? 'Training Data (Original Format)' : 'Patient Data';
+                
+                this.showSuccess(`${exportType} exported: ${data.filename}`);
+                
                 // 创建下载链接
                 const blob = new Blob([JSON.stringify(data.data, null, 2)], { type: 'application/json' });
                 const url = URL.createObjectURL(blob);
@@ -374,6 +595,13 @@ class VirtualDiagnostician {
                 a.download = data.filename;
                 a.click();
                 URL.revokeObjectURL(url);
+                
+                // 如果是训练数据，显示额外提示
+                if (isTrainingData) {
+                    setTimeout(() => {
+                        this.showNotification('Training data exported in original JSON format', 'info');
+                    }, 1000);
+                }
             } else {
                 this.showError('Export failed: ' + data.error);
             }
@@ -515,6 +743,162 @@ class VirtualDiagnostician {
         }
     }
 
+    addTrainingDataInfo(patient) {
+        // 移除现有的训练数据信息
+        this.removeTrainingDataInfo();
+        
+        // 获取患者信息容器
+        const patientInfoDiv = document.getElementById('patientInfo');
+        
+        // 创建训练数据额外信息
+        const trainingDataDiv = document.createElement('div');
+        trainingDataDiv.id = 'trainingDataInfo';
+        trainingDataDiv.className = 'mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200';
+        
+        trainingDataDiv.innerHTML = `
+            <h4 class="text-sm font-medium text-blue-800 mb-2">
+                <i class="fas fa-database mr-1"></i>Data Details
+            </h4>
+            <div class="space-y-1 text-sm">
+                ${patient.birthdate ? `<div class="flex justify-between"><span class="text-blue-600">Birth Date:</span><span class="font-medium">${patient.birthdate}</span></div>` : ''}
+                ${patient.blood_type ? `<div class="flex justify-between"><span class="text-blue-600">Blood Type:</span><span class="font-medium">${patient.blood_type}</span></div>` : ''}
+                ${patient.weight ? `<div class="flex justify-between"><span class="text-blue-600">Weight:</span><span class="font-medium">${patient.weight} kg</span></div>` : ''}
+                ${patient.height ? `<div class="flex justify-between"><span class="text-blue-600">Height:</span><span class="font-medium">${patient.height} cm</span></div>` : ''}
+                ${patient.address ? `<div class="mt-2"><span class="text-blue-600">Address:</span><br><span class="font-medium text-xs">${patient.address}</span></div>` : ''}
+            </div>
+        `;
+        
+        patientInfoDiv.appendChild(trainingDataDiv);
+    }
+    
+    removeTrainingDataInfo() {
+        const existingDiv = document.getElementById('trainingDataInfo');
+        if (existingDiv) {
+            existingDiv.remove();
+        }
+    }
+    
+    async loadTrainingDataStats() {
+        try {
+            const response = await fetch('/api/training/summary');
+            if (response.ok) {
+                this.trainingDataStats = await response.json();
+                this.updateTrainingDataStats();
+            }
+        } catch (error) {
+            console.error('Failed to load training data stats:', error);
+        }
+    }
+    
+    async loadMoreTrainingData() {
+        try {
+            const inputValue = this.trainingLoadCount.value.trim();
+            
+            // 验证输入
+            if (!inputValue) {
+                this.showError('Please enter the number of patients to load');
+                return;
+            }
+            
+            const count = parseInt(inputValue);
+            if (isNaN(count) || count < 1) {
+                this.showError('Please enter a valid number (minimum 1)');
+                return;
+            }
+            
+            if (this.trainingDataStats && count > this.trainingDataStats.total_patients) {
+                this.showError(`Cannot load more than ${this.trainingDataStats.total_patients} patients (total available)`);
+                return;
+            }
+            
+            const remainingPatients = this.trainingDataStats ? 
+                this.trainingDataStats.total_patients - this.loadedTrainingPatients.length : count;
+            
+            if (remainingPatients <= 0) {
+                this.showError('All training patients are already loaded');
+                return;
+            }
+            
+            let actualCount = count;
+            if (count > remainingPatients) {
+                this.showNotification(`Only ${remainingPatients} patients remain. Loading ${remainingPatients} instead.`, 'info');
+                actualCount = remainingPatients;
+            }
+            
+            this.loadMoreTrainingBtn.disabled = true;
+            this.loadMoreTrainingBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Loading...';
+            
+            const response = await fetch(`/api/training/patients?limit=${actualCount}`);
+            if (response.ok) {
+                const newTrainingPatients = await response.json();
+                
+                // 合并新患者（避免重复）
+                const existingIds = new Set(this.loadedTrainingPatients.map(p => p.id));
+                const uniqueNewPatients = newTrainingPatients.filter(p => !existingIds.has(p.id));
+                
+                this.loadedTrainingPatients = [...this.loadedTrainingPatients, ...uniqueNewPatients];
+                
+                // 重新加载普通患者列表
+                const regularResponse = await fetch('/api/patients');
+                if (regularResponse.ok) {
+                    const allPatients = await regularResponse.json();
+                    const regularPatients = allPatients.filter(p => !p.id.startsWith('training_'));
+                    this.updatePatientSelect(regularPatients, this.loadedTrainingPatients);
+                }
+                
+                this.showSuccess(`Loaded ${uniqueNewPatients.length} new training patients`);
+                
+                // 清空输入框
+                this.trainingLoadCount.value = '';
+            } else {
+                const error = await response.json();
+                this.showError('Failed to load training patients: ' + error.error);
+            }
+        } catch (error) {
+            this.showError('Failed to load training patients: ' + error.message);
+        } finally {
+            this.loadMoreTrainingBtn.disabled = false;
+            this.loadMoreTrainingBtn.innerHTML = 'Load';
+        }
+    }
+    
+    updateTrainingDataStats() {
+        this.loadedTrainingCount.textContent = this.loadedTrainingPatients.length;
+        
+        if (this.trainingDataStats) {
+            this.totalTrainingCount.textContent = this.trainingDataStats.total_patients || '-';
+            
+            // 更新加载提示信息
+            const loaded = this.loadedTrainingPatients.length;
+            const total = this.trainingDataStats.total_patients;
+            const remaining = total - loaded;
+            
+            if (remaining > 0) {
+                this.loadingHint.textContent = `${remaining} patients remaining (${loaded}/${total} loaded)`;
+                this.trainingLoadCount.placeholder = `1-${remaining}`;
+                this.trainingLoadCount.max = remaining;
+            } else {
+                this.loadingHint.textContent = 'All patients loaded';
+                this.trainingLoadCount.placeholder = 'All loaded';
+            }
+        } else {
+            this.loadingHint.textContent = 'Enter number of patients to load';
+            this.trainingLoadCount.placeholder = 'Enter count';
+        }
+        
+        // 如果已经加载了所有患者，禁用加载按钮和输入框
+        if (this.trainingDataStats && 
+            this.loadedTrainingPatients.length >= this.trainingDataStats.total_patients) {
+            this.loadMoreTrainingBtn.disabled = true;
+            this.loadMoreTrainingBtn.textContent = 'All Loaded';
+            this.trainingLoadCount.disabled = true;
+        } else {
+            this.loadMoreTrainingBtn.disabled = false;
+            this.loadMoreTrainingBtn.textContent = 'Load';
+            this.trainingLoadCount.disabled = false;
+        }
+    }
+
     showHistoryModal(history) {
         // Create modal HTML
         const modal = document.createElement('div');
@@ -591,6 +975,8 @@ class VirtualDiagnostician {
             }
         });
     }
+
+
 }
 
 // 初始化应用
