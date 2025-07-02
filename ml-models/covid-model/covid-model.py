@@ -80,7 +80,7 @@ class cnnModel:
 # Main Program
 def main():
     try:
-        folder = "../data/Set-2"
+        folder = "../data/Set-4"
 
         model = cnnModel()
         model.preprocess_data(folder)

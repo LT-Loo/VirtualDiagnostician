@@ -5,6 +5,9 @@
 credentials
 data
 trained-models
+test-data
+test-result
+
 /.idea
 # Ignore Python cache files
 __pycache__/
@@ -13,3 +16,4 @@ __pycache__/
 *.meta
 
 /exports
+

@@ -1,0 +1,47 @@
+{
+  "export_info": {
+    "system": "Virtual Diagnostician",
+    "version": "1.0",
+    "export_timestamp": "2025-07-02T15:32:12.922418",
+    "format": "JSON"
+  },
+  "patient_data": {
+    "id": "66351ee4-502f-4721-ab5b-bb02172f5e53",
+    "name": "John Smith",
+    "age": 35,
+    "gender": "Male",
+    "phone": "13800138001",
+    "email": "john.smith@example.com",
+    "medical_history": {
+      "allergies": [
+        "Penicillin"
+      ],
+      "chronic_conditions": [],
+      "records": [
+        {
+          "date": "2024-01-15",
+          "condition": "Common Cold",
+          "symptoms": [
+            "fever",
+            "cough"
+          ],
+          "treatment": "Rest and plenty of fluids"
+        }
+      ]
+    },
+    "diagnoses": [],
+    "created_at": "2025-07-02 05:07:37",
+    "updated_at": "2025-07-02 05:07:37"
+  },
+  "chat_interaction": {
+    "total_messages": 0,
+    "messages": []
+  },
+  "medical_summary": {
+    "patient_age": 35,
+    "patient_gender": "Male",
+    "reported_symptoms": [],
+    "conversation_duration": 0,
+    "last_interaction": null
+  }
+}
