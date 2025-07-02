@@ -19,7 +19,7 @@ class randomForestModel:
     def preprocess_data(self, folder):
         data = []
 
-        print("Processing record data...")
+        print("Processing data...")
         for patientFolder in os.listdir(folder):
             patientPath = os.path.join(folder, patientFolder)
             for filename in os.listdir(patientPath):
@@ -28,14 +28,17 @@ class randomForestModel:
                     with open(filepath, "r") as f:
                         data.append(json.load(f))
 
-        self.df = pd.DataFrame(data)
+        # self.df = pd.DataFrame(data)
+        return pd.DataFrame(data)
 
     def getInputAndTarget(self, df):
-        x = df.drop(columns = ["Diabetes_Diagnosis", "Record_ID"])
-        y = df["Diabetes_Diagnosis"]
-
+        x = df.drop(columns = ["Diabetes_Diagnosis", "Record_ID"], errors = "ignore")
         x = pd.get_dummies(x)
-        y = y.map({"Non-Diabetic": 0, "Diabetic": 1})
+
+        y = None
+        if "Diabetes_Diagnosis" in df.columns:
+            y = df["Diabetes_Diagnosis"]
+            y = y.map({"Non-Diabetic": 0, "Diabetic": 1})
 
         return x, y        
 
@@ -48,17 +51,30 @@ class randomForestModel:
         print("Done training model.")
 
     # Predict test data
-    def predict(self, test):
-        x, y = self.getInputAndTarget(test)
+    def predict(self, folder):
+        start = time.time()
+
+        print("Retrieve test data...")
+        testdf = self.preprocess_data(folder)
+        x, y = self.getInputAndTarget(testdf)
+        print("Data processed.")
 
         print("Testing model...")
-        start = time.time()
         predict = self.model.predict(x)
+        print("Testing complete.")
+
+        print("Exporting result to csv...")
+        result = pd.DataFrame(testdf["Record_ID"])
+        result = result.rename(columns = {"Record_ID" : "Patient ID"})
+        result["Diabetes"] = predict
+        result["Diabetes"] = result["Diabetes"].map({0: "Negative",  1: "Positive"})
+        result.to_csv("../test-result/set-1-diabetes.csv", index = False)
+        print("Result exported.")
+        
         end = time.time()
         duration = end - start
-
-        print("Testing Result: ")
-        print("Accuracy: ", accuracy_score(y, predict), f"; Time Used: {duration:.3f} seconds.")
+        print(f"Operation Time: {duration:.3f} seconds.")
+        
 
     # Save trained model
     def saveModel(self, filename):
@@ -110,10 +126,15 @@ def main():
         #         item.download_to_filename(localPath)
 
         folder = "../data/Set-1"
+        testFolder = "../test-data/set-1"
         model = randomForestModel()
-        model.preprocess_data(folder)
-        model.train()
-        model.saveModel("trained-models/diabetes-model.pkl")
+        # model.df = model.preprocess_data(folder)
+        # model.train()
+        # model.saveModel("trained-models/diabetes-model.pkl")
+
+        model.getModel("../trained-models/diabetes-model.pkl")
+        model.predict(testFolder)
+
         # model.predict()
 
 
