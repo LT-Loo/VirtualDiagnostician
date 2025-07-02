@@ -5,3 +5,9 @@
 credentials
 data
 trained-models
+/.idea
+# Ignore Python cache files
+__pycache__/
+/.idea
+*.pyc
+*.meta
