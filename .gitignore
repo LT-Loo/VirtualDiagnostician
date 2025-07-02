@@ -7,3 +7,13 @@ data
 trained-models
 test-data
 test-result
+
+/.idea
+# Ignore Python cache files
+__pycache__/
+/.idea
+*.pyc
+*.meta
+
+/exports
+
