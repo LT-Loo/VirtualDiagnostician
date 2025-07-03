@@ -67,7 +67,7 @@ class randomForestModel:
         result = pd.DataFrame(testdf["Record_ID"])
         result = result.rename(columns = {"Record_ID" : "Patient ID"})
         result["Diabetes"] = predict
-        result["Diabetes"] = result["Diabetes"].map({0: "Negative",  1: "Positive"})
+        result["Diabetes"] = result["Diabetes"].map({0: "Non-Diabetic",  1: "Diabetic"})
         result.to_csv("../test-result/set-1-diabetes.csv", index = False)
         print("Result exported.")
         
